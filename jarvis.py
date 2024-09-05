@@ -1,174 +1,166 @@
+import os
+import random
 import sys
-import pyttsx3 # python text to speech module (pip install)
-import datetime  
-import time #built in
-import speech_recognition as sr #(pip install)
-import wikipedia # (pip install)
-import webbrowser #(built in)
-import os #opens windows directories (built in)
-import random #(built in)
-import smtplib #(built in)
+import datetime
+import pyttsx3
+import speech_recognition as sr
+import wikipedia
+import webbrowser
+import smtplib
+import json  # To handle JSON files
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
-mail_list = {"papa":"dasgupta.27@gmail.com", "mamma":"mousumi10.c@gmail.com"}
+# Email credentials
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_PASS = os.getenv("EMAIL_PASS")
 
+# Initialize Text-to-Speech engine
+engine = pyttsx3.init("sapi5")
+voices = engine.getProperty("voices")
+engine.setProperty('voice', voices[0].id)
 
-engine = pyttsx3.init("sapi5") #sapi5 is like an API... windows ki voice hai
-voices = engine.getProperty("voices") #List of pyttsx.voice.Voice descriptor objects
-#print(voices[0].id) #david select kara
-engine.setProperty('voice',voices[0].id) #0 is purush and 1 is mahila
-
-
+REMINDER_FILE = "reminders.json"
 
 def speak(audio):
-    engine.say(audio) 
-    engine.runAndWait() 
+    engine.say(audio)
+    engine.runAndWait()
 
-def wishMe():
-    hour = int(datetime.datetime.now().hour)
-    if hour>=0 and hour<12:
-        speak("Good Morning Sir!")
-    elif hour>=12 and hour<16:
-        speak("Good Afternoon Sir")
+def wish_me():
+    hour = datetime.datetime.now().hour
+    if hour < 12:
+        speak("Good Morning!")
+    elif 12 <= hour < 16:
+        speak("Good Afternoon!")
     else:
-        speak("Good Evening Sir!")
-    
+        speak("Good Evening!")
     speak("Jarvis at your service. How may I help you?")
 
-def TakeCommand():    
-    #it takes input from mic and returns string output
+def take_command():
     r = sr.Recognizer()
     with sr.Microphone() as source:
         print("Listening...")
-        r.pause_threshold=1
-        r.energy_threshold=1000
+        r.pause_threshold = 1
+        r.energy_threshold = 1000
         audio = r.listen(source)
-    
+
     try:
         print("Recognizing...")
-        query = r.recognize_google(audio, language= "en-in")
-        print (f"User said: {query}\n")
+        query = r.recognize_google(audio, language="en-in")
+        print(f"User said: {query}\n")
+    except sr.UnknownValueError:
+        print("Could not understand audio. Please try again.")
+        return "None"
+    except sr.RequestError as e:
+        print(f"Could not request results; {e}")
+        return "None"
+
+    return query.lower()
+
+def send_email(to, content):
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, to, content)
+        server.close()
+        speak("Email has been sent successfully.")
     except Exception as e:
-        # print(e)  # Comment out if you don't want to see the error
-         print("Say that again, please")
-         return "None"
+        print(e)
+        speak("Unable to send the email due to an error.")
 
-    
-    return query
+def open_website(url, site_name):
+    speak(f"Opening {site_name}.")
+    webbrowser.open_new_tab(url)
 
-def sendEmail(to, content):
-    server = smtplib.SMTP("smtp.gmail.com",587) #modern port for secure SMTP
-    server.ehlo()
-    server.starttls()
-    server.login("jyotikadasgupta@gmail.com","tacmp@123")
-    server.sendmail("jyotikadasgupta@gmail.com",to,content)
-    server.close()
+def add_reminder(reminder_text):
+    # Load existing reminders from the JSON file or create a new list
+    try:
+        with open(REMINDER_FILE, 'r') as file:
+            reminders = json.load(file)
+    except FileNotFoundError:
+        reminders = []
 
-    
+    # Add the new reminder
+    reminders.append({"reminder": reminder_text, "timestamp": str(datetime.datetime.now())})
 
- 
-if __name__=="__main__": #ye wala part run sirf isi module me hoga
-    wishMe()
-    while True:
-        query = TakeCommand().lower()
-        #logic for executing tasks
-        if "wikipedia" in query:
-            speak("Searching wikipedia, sir")
-            query = query.replace("wikipedia","")
-            #print(query)
-            results = wikipedia.summary(query, sentences=2)
-            speak("according to wikipedia")
-            print(results)
-            speak(results)
-        
-        elif "open youtube" in query:
-            speak("Opening youtube, sir.")
-            webbrowser.open("https://www.youtube.com",new=2)
-        
-        elif "open google" in query:
-            speak("Opening google, sir.")
-            webbrowser.open_new_tab("https://www.google.co.in")
-        
-        elif "open amazon" in query:
-            speak("Sure! Happy Shopping!")
-            webbrowser.open_new_tab("https://www.amazon.in")
+    # Save the reminders back to the JSON file
+    with open(REMINDER_FILE, 'w') as file:
+        json.dump(reminders, file, indent=4)
 
-        elif "photos" in query:
-            pic_dir = "D:\Wallpapers"
-            pictures = os.listdir(pic_dir)
-            speak("Showing photos, sir.")
-            os.startfile(os.path.join(pic_dir,pictures[random.randint(30,400)]))
-        
-        elif "the time" in query:
-            t = datetime.datetime.now().strftime("%H:%M:%S")
-            print(t)
-            speak (f"Sir, the time right now is {t}.")
-        
-        elif "visual studio" in query:
-            codepath="C:\Program Files\Microsoft VS Code"
-            speak("Good luck with coding sir!")
-            os.startfile(codepath)
+    speak("Reminder has been added successfully.")
 
-        elif "music" in query or "can you open spotify for me " in query:
-            speak("enjoy sir!")
-            webbrowser.open_new_tab("https://in.pinterest.com/")
-        
-        elif "open pinterest" in query or "can you open pinterest for me " in query:
-            speak("enjoy sir!")
-            webbrowser.open_new_tab("https://open.spotify.com")
-        
-        
-
-        elif "remind me" in query:      
-            query=query.replace("remind me to","")
-            print("writing sir")
-            speak("writing sir")
-            
-            with open("C:\\Desktop\\Reminder.txt","w") as f:
-                f.write(query)
-                f.write("\n")
-            
-        elif "send email" in query:
-            if "mamma" in query or "mama" in query:
-                try:
-                    speak("What should I write?")
-                    content = TakeCommand()
-                    to = mail_list.get("mamma")
-                    sendEmail(to,content)
-                    speak("Mail sent, sir.")
-                except Exception as e:
-                    print(e)
-                    speak("Sorry sir! Unable to send the mail due to some error.")
-
-            elif "papa" in query:
-                try:
-                    speak("What should I write?")
-                    content = TakeCommand()
-                    to = mail_list.get("papa")
-                    sendEmail(to,content)
-                    speak("Mail sent, sir.")
-                except Exception as e:
-                    print(e)
-                    speak("Sorry sir! Unable to send the mail due to some error.")
-            
+def read_reminders():
+    try:
+        with open(REMINDER_FILE, 'r') as file:
+            reminders = json.load(file)
+            if reminders:
+                speak("Here are your reminders:")
+                for reminder in reminders:
+                    print(reminder["reminder"])
+                    speak(reminder["reminder"])
             else:
-                try:
-                    speak("What should I write?")
-                    content = TakeCommand()
-                    to = "jyotikadasgupta@gmail.com"
-                    sendEmail(to,content)
-                    speak("Mail sent, sir.")
-                except Exception as e:
-                    print(e)
-                    speak("Sorry sir! Unable to send the mail due to some error.")
+                speak("You have no reminders.")
+    except FileNotFoundError:
+        speak("You have no reminders.")
 
-        
-        elif any(keyword in query for keyword in ["quit", "exit", "stop", "shut up", "goodbye", "good bye"]):
-            speak("Goodbye sir! See you soon.")
-            sys.exit()
-        
+def execute_tasks(query):
+    if "wikipedia" in query:
+        speak("Searching Wikipedia...")
+        query = query.replace("wikipedia", "")
+        results = wikipedia.summary(query, sentences=2)
+        speak("According to Wikipedia")
+        print(results)
+        speak(results)
+
+    elif "open youtube" in query:
+        open_website("https://www.youtube.com", "YouTube")
+
+    elif "open google" in query:
+        open_website("https://www.google.com", "Google")
+
+    elif "open amazon" in query:
+        open_website("https://www.amazon.com", "Amazon")
+
+    elif "open spotify" in query:
+        open_website("https://open.spotify.com", "Spotify")
+
+    elif "the time" in query:
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        print(current_time)
+        speak(f"The time is {current_time}.")
+
+    elif "send email" in query:
+        speak("To whom should I send the email?")
+        recipient = take_command()
+        to = mail_list.get(recipient, None)
+        if to:
+            speak("What should I say?")
+            content = take_command()
+            send_email(to, content)
         else:
-            speak("Sorry. I don't know that command. Please tell the developer to add this command.")
+            speak("Recipient not found in the contact list.")
 
+    elif "add reminder" in query:
+        speak("What should I remind you about?")
+        reminder_text = take_command()
+        add_reminder(reminder_text)
 
-            
+    elif "read reminders" in query:
+        read_reminders()
+
+    elif any(keyword in query for keyword in ["quit", "exit", "stop", "goodbye"]):
+        speak("Goodbye! Have a nice day.")
+        sys.exit()
+
+    else:
+        speak("I'm sorry, I didn't understand that command.")
+
+if __name__ == "__main__":
+    wish_me()
+    while True:
+        query = take_command()
+        if query != "None":
+            execute_tasks(query)
